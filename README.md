@@ -1,7 +1,8 @@
 1) The solution is an extension of Token Bucket algorithm for rate limiting API. The algorithm allows certain 
-number of request within duration of time. Each request takes certain tokens(in our case its 1).  And refills the bucket, 
-with tokens, so subsequent request can use the newly added tokens after certain duration.
-However, this does not include penalty if tokens are not present. To stop API from being called for a certain time 
+number of request within some duration of time. Each request requires certain tokens(in our case its 1).  And refills the bucket, 
+with some tokens, after a time interval, so subsequent request can use the newly added tokens after certain duration.
+However, if the request is attempted and there were not enough tokens(here < 1) to handle the request, we want
+to impose penalty, for certain time. To stop API from being called for a certain time 
 period, we customized the algorithm with two additional attributes - `lastFailedTimestamp` and `penaltyInSeconds`.
 We have implemented a `TokenBucket` class accepting three arguments. 
 - `maxBucketSize` - total requests allowed (1 token used by 1 request) for particular duration.
@@ -13,13 +14,13 @@ Non-constructor class attributes
 - `lastRefillTimestamp` - represents timestamp when last bucket was refilled, helps us to repopulate tokens.
 - `lastFailedTimestamp` - represents timestamp when last request was failed, as tokens were not present, helps us to avoid request till
 `lastFailedTimestamp` + `penaltyInSeconds`
-2) The `penaltyInSeconds` is a additional parameter that we are using, as part of the solution.
+2) The `penaltyInSeconds` is an additional parameter that we are using, as part of the solution.
 We initialize `lastFailedTimestamp` using this, assuming penalty happened `penaltyInSeconds` ago. And whenever, we check if 
 request is allowed, we look at difference between current time and `lastFailedTimestamp`. 
 If `lastFailedTimestamp` was  `penaltyInSeconds` ago, then we will consider tokens and allow the request accordingly.
 3) The project can be built using `mvn clean install` with Java 11, after `cd rate-limiting-api`. And the class can be run using
-`java -jar target/rate-limiting-api-1.0-SNAPSHOT.jar`. Here the `TokenBucket` allows 15 request within a minute, and again after a minute populates 15 tokens to be used, 1
-token for each request. We put `Thread.sleep(60000)` not as part of solution, but to allow enough time to execute request post penalty. We observed
+`java -jar target/rate-limiting-api-1.0-SNAPSHOT.jar`. Here the `TokenBucket` allows 15 request within a minute, and again after a minute populates 15 tokens to be used, where 1
+token for each request. We put `Thread.sleep(60000)`, which is not a part of solution, but to allow enough time to execute request post penalty. Here, we observed
 request(0-index) 16th, 32nd, 48th skipped, resulting in 1 minute penalty. Following is the log, where timestamp is in seconds.
 ```
 Request 0 : ----API RESPONSE----  is made at: 1730831347
@@ -75,7 +76,7 @@ Request 49 : ----API RESPONSE----  is made at: 1730831527
 
 ```
 4) If we want to handle 20 request per minute, assuming we cannot increase maximum bucket size. 
-- We can consider caching, and if cache no hit, and no token is left, we will penalize, otherwise, 
+- We can consider caching, and if cache is not hit, and no token is left, we will penalize, otherwise, 
 will pick response from cache. 
 - Another option to consider is run multiple instances at server side, proportionally, increasing the
 API limit.
